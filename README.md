@@ -7,8 +7,7 @@ Command-line tool for finding Bazel dependencies which are not actually used in 
 ## What is an unused dependency?
 
 An unused Bazel dependency is an unnecessary entry in the `deps` field of a `java_library` or `java_binary` target in
-a `BUILD` file, meaning the code being compiled doesn't actually have any dependency on that library. See the Appendix
-for an example! Over time, unused dependencies accumulate as code changes and `BUILD` files are not updated to reflect
+a `BUILD` file, meaning the code being compiled doesn't actually have any dependency on that library. Over time, unused dependencies accumulate as code changes and `BUILD` files are not updated to reflect
 those changes.
 
 ## Why are unused dependencies bad?
@@ -61,10 +60,8 @@ INFO: Build completed successfully, 2867 total actions
 
 ## Limitations
 
-This tool does not support:
+This tool does not support the following:
 
-- Third-party dependencies. This shouldn't be hard; we would just need to create a Bazel aspect to extract exported
-  symbols from a JAR file. (At Stripe, this was implemented in `ThirdPartySymbolsIndex.java` but now it's a skeleton
-  waiting for you to fill it in 🙂)
-- Scala and Kotlin. We would need to write parsers for Scala/Kotlin code to find the symbols used therein.
-- Test targets. This is likely an easy change to `TargetDependencyGraphLoader` - we just haven't looked into it.
+- Third-party dependencies (#2)
+- Scala (#3) and Kotlin (#4)
+- Java test targets (#5)

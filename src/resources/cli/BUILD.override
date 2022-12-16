@@ -1,0 +1,11 @@
+java_import(
+    name = "analyzer_jar",
+    jars = [":plugin-binary_deploy.jar"],
+    visibility = ["//visibility:public"],
+)
+
+java_plugin(
+    name = "analyzer",
+    visibility = ["//visibility:public"],
+    deps = [":analyzer_jar"],
+)

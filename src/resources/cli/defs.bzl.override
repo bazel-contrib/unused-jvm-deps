@@ -1,0 +1,86 @@
+def _analyzer_impl(target, ctx):
+    if JavaInfo not in target:
+        return []
+
+    if not hasattr(ctx.rule.attr, "srcs") or not getattr(ctx.rule.attr, "srcs"):
+        return []
+
+    orig_java_info = target[JavaInfo]
+
+    # For example, this will extract the file into a file name like "src.main.java.com.stripe.horizon.build.testpkg--testpkg-unused-analysis.json"
+    output_jar_name = "{}--{}-unused-analysis.jar".format(target.label.package.replace("/", "."), target.label.name)
+
+    output_jar = ctx.actions.declare_file(output_jar_name)
+    java_common.compile(
+        ctx,
+        java_toolchain = ctx.attr._java_toolchain[java_common.JavaToolchainInfo],
+        source_jars = orig_java_info.source_jars,
+        javac_opts = (orig_java_info.compilation_info.javac_options if orig_java_info.compilation_info else []) + [
+            "-Xplugin:'StripeDependencyAnalyzerPlugin {}'".format(str(target.label)),
+            "--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
+        ],
+        output = output_jar,
+        plugins = [ctx.attr._analyzer[JavaPluginInfo]],
+        deps = [
+            java_common.merge([dep[JavaInfo] for dep in ctx.rule.attr.deps if JavaInfo in dep]),
+        ],
+    )
+
+    extracted_file_name = "{}--{}-all-symbols.json".format(target.label.package.replace("/", "."), target.label.name)
+
+    extracted_file = ctx.actions.declare_file(extracted_file_name)
+
+    # Use Zipper to extract the Feature Report file, otherwise write a templated json file
+    ctx.actions.run_shell(
+        inputs = [ctx.executable._zipper, output_jar],
+        outputs = [extracted_file],
+        command = """
+set -euo pipefail
+
+ZIPPER=$1
+CLASS_JAR=$2
+OUTPUT_FILE=$3
+
+echo '[' > $OUTPUT_FILE
+json_files=$($ZIPPER v $CLASS_JAR | grep -oE '[^ ]+-symbols.json$')
+for json_file in $json_files; do
+    $ZIPPER x $CLASS_JAR $json_file
+    cat $json_file >> $OUTPUT_FILE
+    echo "," >> $OUTPUT_FILE
+done
+echo 'null' >> $OUTPUT_FILE
+echo ']' >> $OUTPUT_FILE
+""",
+        use_default_shell_env = True,
+        progress_message = "Extracting Java symbol metadata from JAR {}".format(target.label),
+        mnemonic = "ExtractUnusedAnalysis",
+        arguments = [ctx.actions.args().add(ctx.executable._zipper).add(output_jar).add(extracted_file)],
+    )
+
+    return [
+        OutputGroupInfo(
+            unused_deps_analysis_file = depset([extracted_file]),
+        ),
+    ]
+
+analyzer = aspect(
+    implementation = _analyzer_impl,
+    attr_aspects = ["*"],
+    fragments = ["java"],
+    attrs = {
+        "_analyzer": attr.label(default = ":analyzer", providers = [JavaPluginInfo]),
+        "_zipper": attr.label(
+            default = "@bazel_tools//tools/zip:zipper",
+            allow_single_file = True,
+            executable = True,
+            cfg = "host",
+        ),
+        "_java_toolchain": attr.label(
+            default = Label("@bazel_tools//tools/jdk:current_java_toolchain"),
+        ),
+        "_java_runtime": attr.label(
+            cfg = "host",
+            default = Label("@bazel_tools//tools/jdk:current_java_runtime"),
+        ),
+    },
+)

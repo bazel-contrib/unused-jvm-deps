@@ -63,6 +63,6 @@ INFO: Build completed successfully, 2867 total actions
 
 This tool does not support the following:
 
-- Third-party dependencies (#2)
-- Scala (#3) and Kotlin (#4)
-- Java test targets (#5)
+- Third-party dependencies (https://github.com/bazel-contrib/unused-jvm-deps/issues/2)
+- Scala (https://github.com/bazel-contrib/unused-jvm-deps/issues/3) and Kotlin (https://github.com/bazel-contrib/unused-jvm-deps/issues/4)
+- Java test targets (https://github.com/bazel-contrib/unused-jvm-deps/issues/5)

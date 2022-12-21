@@ -25,8 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - id: bazel_from_bazelversion
-        run: echo "bazelversion=$(head -n 1 .bazelversion)" >> $GITHUB_OUTPUT
+      # XXX(JohnMurray): Add additional values here if we want to test with multiple
+      #                  versions of bazel.
+      #- id: bazel_from_bazelversion
+      #  run: echo "bazelversion=$(head -n 1 .bazelversion)" >> $GITHUB_OUTPUT
       - id: bazel_5
         run: echo "bazelversion=5.3.2" >> $GITHUB_OUTPUT
     outputs:
@@ -47,7 +49,6 @@ jobs:
         bazelversion: ${{ fromJSON(needs.matrix-prep-bazelversion.outputs.bazelversions) }}
         folder:
           - "."
-          - "e2e/workspace"
     
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:

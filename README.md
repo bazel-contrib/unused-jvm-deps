@@ -1,4 +1,5 @@
 # unused-jvm-deps
+[![CI](https://github.com/bazel-contrib/unused-jvm-deps/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/bazel-contrib/unused-jvm-deps/actions/workflows/ci.yaml)
 
 Command-line tool for finding Bazel dependencies which are not actually used in code.
 

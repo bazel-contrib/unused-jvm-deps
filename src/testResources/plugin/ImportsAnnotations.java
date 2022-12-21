@@ -2,12 +2,13 @@ package uppsala.src.test.resources.com.stripe.build.dependencyanalyzer;
 
 import java.beans.JavaBean;
 import javax.annotation.Nullable;
-import javax.validation.constraints.Positive;
+import javax.annotation.processing.Generated;
 
 @JavaBean
 public class ImportsAnnotations {
 
-  @Positive public int annotatedField = 1;
+  @Generated(value="com.example.MyGenerator")
+  public int annotatedField = 1;
 
   @Nullable
   public String annotatedMethod() {

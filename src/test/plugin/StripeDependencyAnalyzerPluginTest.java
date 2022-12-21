@@ -195,7 +195,8 @@ public class StripeDependencyAnalyzerPluginTest {
             .add(
                 "java.beans.JavaBean",
                 "javax.annotation.Nullable",
-                "javax.validation.constraints.Positive",
+                "javax.annotation.processing.Generated",
+                "javax.annotation.processing.Generated.value",
                 "java.lang.annotation.Annotation",
                 "java.lang.String",
                 // interfaces implemented / classes extended by String

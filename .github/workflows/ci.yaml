@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-      bazelversion: ${{ fromJSON(needs.matrix-prep-bazelversion.outputs.bazelversions) }}
+        bazelversion: ${{ fromJSON(needs.matrix-prep-bazelversion.outputs.bazelversions) }}
         folder:
           - "."
           - "e2e/workspace"

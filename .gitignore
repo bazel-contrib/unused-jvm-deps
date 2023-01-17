@@ -23,3 +23,6 @@
 hs_err_pid*
 
 /bazel-*
+
+# IDE Files
+.idea/

@@ -7,6 +7,15 @@ def _analyzer_impl(target, ctx):
 
     orig_java_info = target[JavaInfo]
 
+    # Merge our javac opts, but drop any other plugins that may be in use
+    javac_opts = [
+        "-Xplugin:'StripeDependencyAnalyzerPlugin {}'".format(str(target.label)),
+        "--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
+    ]
+    for opt in (orig_java_info.compilation_info.javac_options if orig_java_info.compilation_info else []):
+        if not opt.startswith('-Xplugin:'):
+            javac_opts.append(opt)
+
     # For example, this will extract the file into a file name like "src.main.java.com.stripe.horizon.build.testpkg--testpkg-unused-analysis.json"
     output_jar_name = "{}--{}-unused-analysis.jar".format(target.label.package.replace("/", "."), target.label.name)
 
@@ -15,10 +24,7 @@ def _analyzer_impl(target, ctx):
         ctx,
         java_toolchain = ctx.attr._java_toolchain[java_common.JavaToolchainInfo],
         source_jars = orig_java_info.source_jars,
-        javac_opts = (orig_java_info.compilation_info.javac_options if orig_java_info.compilation_info else []) + [
-            "-Xplugin:'StripeDependencyAnalyzerPlugin {}'".format(str(target.label)),
-            "--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
-        ],
+        javac_opts = javac_opts,
         output = output_jar,
         plugins = [ctx.attr._analyzer[JavaPluginInfo]],
         deps = [

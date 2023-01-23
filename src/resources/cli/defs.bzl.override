@@ -7,7 +7,10 @@ def _analyzer_impl(target, ctx):
 
     orig_java_info = target[JavaInfo]
 
-    # Merge our javac opts, but drop any other plugins that may be in use
+    # Merge our javac opts, but drop any other plugins that may be in use. This is to account
+    # for the fact that the `java_common.compile` action will only run with the dependency
+    # analyzer plugin. Extra defined plugins will cause javac to complain about unknown plugins
+    # if not removed.
     javac_opts = [
         "-Xplugin:'StripeDependencyAnalyzerPlugin {}'".format(str(target.label)),
         "--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",

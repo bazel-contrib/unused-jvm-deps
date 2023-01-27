@@ -1,3 +1,30 @@
+
+UnusedDepsAnalysisOutput = provider(
+    fields = {
+        "json_files": "JSON files containing symbol-usage analysis for Jars",
+    }
+)
+
+DEP_ATTRS = ["deps", "exports", "runtime_deps", "srcs"]
+
+def _deps(ctx):
+    deps = []
+    for n in DEP_ATTRS:
+        if hasattr(ctx.rule.attr, n):
+            value = getattr(ctx.rule.attr, n)
+            if type(value) == "list":
+                deps.extend(value)
+            else:
+                deps.append(value)
+    return deps
+
+def _get_child_json_files(ctx):
+    all_json_depsets = []
+    for dep in _deps(ctx):
+        if UnusedDepsAnalysisOutput in dep:
+            all_json_depsets.append(dep[UnusedDepsAnalysisOutput].json_files)
+    return all_json_depsets
+
 def _analyzer_impl(target, ctx):
     if JavaInfo not in target:
         return []
@@ -51,7 +78,7 @@ CLASS_JAR=$2
 OUTPUT_FILE=$3
 
 echo '[' > $OUTPUT_FILE
-json_files=$($ZIPPER v $CLASS_JAR | grep -oE '[^ ]+-symbols.json$')
+json_files=$($ZIPPER v $CLASS_JAR | grep -oE '[^ ]+-symbols.json$' || echo '')
 for json_file in $json_files; do
     $ZIPPER x $CLASS_JAR $json_file
     cat $json_file >> $OUTPUT_FILE
@@ -66,10 +93,14 @@ echo ']' >> $OUTPUT_FILE
         arguments = [ctx.actions.args().add(ctx.executable._zipper).add(output_jar).add(extracted_file)],
     )
 
+    all_json_files = depset([extracted_file], transitive = _get_child_json_files(ctx))
     return [
         OutputGroupInfo(
-            unused_deps_analysis_file = depset([extracted_file]),
+            unused_deps_analysis_file = all_json_files
         ),
+        UnusedDepsAnalysisOutput(
+            json_files = all_json_files
+        )
     ]
 
 analyzer = aspect(

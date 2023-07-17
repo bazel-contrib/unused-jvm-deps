@@ -65,11 +65,6 @@ public class StripeDependencyAnalyzerPlugin implements Plugin {
               SymbolCollectionResult result, CompilationUnitTree compilationUnit) {
             try {
               fileManager.writeResultsToSymbolsFile(result);
-              trees.printMessage(
-                  javax.tools.Diagnostic.Kind.NOTE,
-                  result.toJsonString(),
-                  compilationUnit,
-                  compilationUnit);
             } catch (IOException ex) {
               trees.printMessage(
                   javax.tools.Diagnostic.Kind.ERROR,

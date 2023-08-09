@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -33,8 +34,25 @@ public class AnalyzeUnusedCommand implements Runnable {
   private String databaseFile;
 
   @Nullable
-  @Parameters(paramLabel = "<bazelWorkspace>", description = "Bazel workspace root directory")
-  private String bazelWorkspace;
+  @Option(
+      names = {"-t", "--third-party-index"},
+      description = "CSV for the third-party-index",
+      defaultValue = "")
+  private String thirdPartyIndexCsv;
+
+  @Nullable
+  @Option(
+      names = {"--third-party-index-delimiter"},
+      description = "Delimiter for CSV file of third-party-index",
+      defaultValue = ",",
+      type = Character.class)
+  private Character thirdPartyIndexCsvDelimiter;
+
+  @Nullable
+  @Option(
+      names = {"-x", "--excluded-dep"},
+      description = "Bazel deps that should be excluded from removal suggestions")
+  private Set<String> excludedDependencies;
 
   @Nullable
   @Option(
@@ -59,16 +77,25 @@ public class AnalyzeUnusedCommand implements Runnable {
   @Override
   public void run() {
     try {
-      if (databaseFile == null || bazelWorkspace == null) {
+      if (databaseFile == null || thirdPartyIndexCsvDelimiter == null) {
         throw new IllegalArgumentException(
             "Passed null argument, which should have been handled by Picocli.");
       }
+      Path indexPath = null;
+      if (thirdPartyIndexCsv != null && !thirdPartyIndexCsv.isEmpty()) {
+        indexPath = Path.of(thirdPartyIndexCsv);
+      }
+      if (excludedDependencies == null) {
+        excludedDependencies = Set.of();
+      }
+
       Database database = Database.open(Path.of(databaseFile));
       UnusedDepsAnalysisResult analysisResult =
           UnusedDepsAnalyzer.analyze(
               database,
-              new ThirdPartySymbolsIndex(Path.of(bazelWorkspace)),
-              new BazelTargetFilter(StringUtils.defaultIfEmpty(filter, "")));
+              new ThirdPartySymbolsIndex(indexPath, thirdPartyIndexCsvDelimiter),
+              new BazelTargetFilter(StringUtils.defaultIfEmpty(filter, "")),
+              excludedDependencies);
       outputResult(analysisResult);
 
     } catch (SQLException | IOException e) {

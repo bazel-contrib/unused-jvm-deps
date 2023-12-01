@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import picocli.CommandLine.Command;
@@ -24,7 +25,7 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 @Command(name = "collect", description = "Constructs a local database from the Bazel build graph")
-public class CollectCommand implements Runnable {
+public class CollectCommand implements Callable<Integer> {
 
   @Nullable
   @Parameters(paramLabel = "<bazelTargetPattern>", description = "Root bazel target pattern")
@@ -54,7 +55,7 @@ public class CollectCommand implements Runnable {
   private boolean debug;
 
   @Override
-  public void run() {
+  public Integer call() {
     try {
       // these null checks are already handled by picocli but are needed to satisfy NullAway
       if (bazelTarget == null || bazelWorkspace == null || outputFile == null) {
@@ -67,6 +68,15 @@ public class CollectCommand implements Runnable {
       TargetDependencyGraphLoadResult loadResult =
           TargetDependencyGraphLoader.load(bazelTarget, Path.of(bazelWorkspace));
       System.out.println(loadResult.getDisplay(debug));
+
+      if (loadResult.getParsedTargets().isEmpty()) {
+        System.out.println("Query produced no results; exiting");
+        System.out.println();
+        System.out.println("Raw Bazel output:");
+        System.out.println();
+        System.out.println(loadResult.getBazelErrors());
+        return 1;
+      }
 
       System.out.println("Persisting Bazel query results to database...");
       TargetDependencyGraphPersistResult persistResult =
@@ -116,8 +126,7 @@ public class CollectCommand implements Runnable {
               Path.of(bazelWorkspace), database.getAllBazelTargets());
       if (symbolsFileGatherResult.getSymbolResults().isEmpty()) {
         System.out.println("Failed - did not find any symbol files in " + bazelWorkspace);
-        System.exit(1);
-        return;
+        return 1;
       }
       System.out.println(symbolsFileGatherResult);
 
@@ -137,5 +146,6 @@ public class CollectCommand implements Runnable {
         System.out.println("For full stack trace, use the --debug option!");
       }
     }
+    return 0;
   }
 }

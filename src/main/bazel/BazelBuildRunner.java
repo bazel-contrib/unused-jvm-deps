@@ -38,15 +38,16 @@ public class BazelBuildRunner {
         new ProcessBuilder().directory(new File(bazelWorkspace.toString())).command(args);
 
     String bazelOutput;
+    Process buildProc;
     if (streamOutput) {
-      Process buildProc = buildProcBuilder.inheritIO().start();
-      buildProc.waitFor();
+      buildProc = buildProcBuilder.inheritIO().start();
       bazelOutput = "Streamed above.";
     } else {
-      Process buildProc = buildProcBuilder.start();
+      buildProc = buildProcBuilder.start();
       bazelOutput = IOUtils.toString(buildProc.getErrorStream(), StandardCharsets.UTF_8).trim();
     }
+    int exitCode = buildProc.waitFor();
     Instant endTime = Clock.systemUTC().instant();
-    return BazelBuildResult.create(bazelOutput, Duration.between(startTime, endTime));
+    return BazelBuildResult.create(bazelOutput, Duration.between(startTime, endTime), exitCode);
   }
 }

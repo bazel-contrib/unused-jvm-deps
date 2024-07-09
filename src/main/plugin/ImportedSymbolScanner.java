@@ -25,6 +25,8 @@ import com.sun.tools.javac.code.Type.MethodType;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import javax.tools.JavaFileObject;
 
 /**
@@ -126,13 +128,19 @@ public class ImportedSymbolScanner extends TreePathScanner<Void, Void> {
       we need to reference as imported all the return types and argument types
       of every overload of the invoked method because those class needs to be
       loaded at compile time. */
+
       ClassSymbol parentClass = symbol.enclClass();
-      if (parentClass.members() != null) {
+      var parentClassMembers = parentClass.members();
+      if (parentClassMembers != null) {
         // overloaded methods have the same qualified name as the current symbol
         var overloadSymbols =
-            parentClass
-                .members()
-                .getSymbols(s -> s.getQualifiedName().contentEquals(symbol.getQualifiedName()));
+           StreamSupport.stream( parentClassMembers
+                .getSymbols().spliterator(), false)
+                // https://github.com/bazel-contrib/unused-jvm-deps/issues/20
+                // Apply the filter after the fact so that we're not exposed
+                // to the Filter -> Predicate API change.
+                .filter(s -> s.getQualifiedName().contentEquals(symbol.getQualifiedName()))
+                .collect(Collectors.toList());
         for (Symbol overloadSymbol : overloadSymbols) {
           if (overloadSymbol instanceof MethodSymbol) {
             MethodSymbol overloadMethodSymbol = (MethodSymbol) overloadSymbol;

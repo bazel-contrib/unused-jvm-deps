@@ -1,6 +1,5 @@
 package com.stripe.build.dependencyanalyzer.analysis;
 
-import com.google.common.collect.ImmutableSet;
 import com.stripe.build.dependencyanalyzer.database.Database;
 import com.stripe.build.dependencyanalyzer.database.generated.tables.pojos.BazelEdge;
 import com.stripe.build.dependencyanalyzer.database.generated.tables.pojos.BazelExportEdge;
@@ -26,19 +25,7 @@ import java.util.stream.Collectors;
 
 public class UnusedDepsAnalyzer {
 
-  /**
-   * The dependency analyzer compiler plugin can't examine itself and its own dependencies, so those
-   * targets should not be persisted.
-   */
-  private static final Set<String> DEPENDENCY_ANALYZER_AND_ITS_DEPS = Set.of();
-
-  private static final Set<String> MISC_IGNORED_DEPS = Set.of();
-
-  private static final ImmutableSet<String> IGNORED_DEPS =
-      ImmutableSet.<String>builder()
-          .addAll(ThirdPartySymbolsIndex.ALL_EXCLUDED_TARGETS)
-          .addAll(MISC_IGNORED_DEPS)
-          .build();
+  private final Set<String> excludedDependencies;
 
   private final Database database;
   private final ThirdPartySymbolsIndex thirdPartySymbolsIndex;
@@ -81,18 +68,21 @@ public class UnusedDepsAnalyzer {
   public static UnusedDepsAnalysisResult analyze(
       Database dependencyGraphDatabase,
       ThirdPartySymbolsIndex thirdPartySymbolsIndex,
-      BazelTargetFilter targetFilter) {
-    return new UnusedDepsAnalyzer(dependencyGraphDatabase, thirdPartySymbolsIndex, targetFilter)
+      BazelTargetFilter targetFilter,
+      Set<String> excludedDependencies) {
+    return new UnusedDepsAnalyzer(dependencyGraphDatabase, thirdPartySymbolsIndex, targetFilter, excludedDependencies)
         .performAnalysis();
   }
 
   private UnusedDepsAnalyzer(
       Database dependencyGraphDatabase,
       ThirdPartySymbolsIndex thirdPartySymbolsIndex,
-      BazelTargetFilter targetFilter) {
+      BazelTargetFilter targetFilter,
+      Set<String> excludedDependencies) {
     this.database = dependencyGraphDatabase;
     this.thirdPartySymbolsIndex = thirdPartySymbolsIndex;
     this.targetFilter = targetFilter;
+    this.excludedDependencies = excludedDependencies;
 
     targetIdToBazelTarget = getAllBazelTargetsById();
     targetLabelToBazelTarget = getAllBazelTargetsByLabel();
@@ -242,12 +232,13 @@ public class UnusedDepsAnalyzer {
     return target.getTargetLabel().startsWith("@maven");
   }
 
-  private static boolean shouldIgnoreTarget(BazelTarget target) {
+  private boolean shouldIgnoreTarget(BazelTarget target) {
     // ex: label //src/example/path/dir:lib -> cleaned //src/example/path/dir
     String cleaned = target.getTargetLabel().replaceAll(":.+", "");
-    return DEPENDENCY_ANALYZER_AND_ITS_DEPS.contains(cleaned)
-        || IGNORED_DEPS.contains(cleaned)
-        || IGNORED_DEPS.contains(target.getTargetLabel());
+    return excludedDependencies.contains(cleaned);
+//    return DEPENDENCY_ANALYZER_AND_ITS_DEPS.contains(cleaned)
+//        || IGNORED_DEPS.contains(cleaned)
+//        || IGNORED_DEPS.contains(target.getTargetLabel());
   }
 
   private BazelTarget getBazelTarget(int targetId) {

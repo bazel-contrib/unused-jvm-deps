@@ -1,9 +1,32 @@
-def _analyzer_impl(target, ctx):
-    if JavaInfo not in target:
-        return []
+SymbolMetadata = provider(fields = {
+    "symbol_files": "a depset of the symbol.json files produced while compiling this target",
+})
 
-    if not hasattr(ctx.rule.attr, "srcs") or not getattr(ctx.rule.attr, "srcs"):
-        return []
+def _analyzer_impl(target, ctx):
+    transitive = []
+
+    # is it ok to propagate runtime_deps? I think so, because this provider just exists to ensure that all symbol
+    # json files are actually built, so the tool has all the information it might need
+    for name in ["deps", "dep", "runtime_deps"]:
+        if hasattr(ctx.rule.attr, name):
+            deps = getattr(ctx.rule.attr, name)
+            if type(deps) == "depset":
+                deps = deps.to_list()
+            if type(deps) == "list":
+                for dep in deps:
+                    if SymbolMetadata in dep:
+                        transitive.append(dep[SymbolMetadata].symbol_files)
+
+    if (JavaInfo not in target or
+        not hasattr(ctx.rule.attr, "srcs") or
+        not getattr(ctx.rule.attr, "srcs") or
+        # TODO: figure out how to recreate java_grpc_library classpath in our java_common.compile call :(
+        "java_grpc_library" in ctx.rule.kind):
+        return [
+            SymbolMetadata(
+                symbol_files = depset(transitive = transitive),
+            ),
+        ]
 
     orig_java_info = target[JavaInfo]
 
@@ -16,20 +39,26 @@ def _analyzer_impl(target, ctx):
         "--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
     ]
     for opt in (orig_java_info.compilation_info.javac_options if orig_java_info.compilation_info else []):
-        if not opt.startswith('-Xplugin:'):
+        if not opt.startswith("-Xplugin:"):
             javac_opts.append(opt)
 
     # For example, this will extract the file into a file name like "src.main.java.com.stripe.horizon.build.testpkg--testpkg-unused-analysis.json"
     output_jar_name = "{}--{}-unused-analysis.jar".format(target.label.package.replace("/", "."), target.label.name)
 
     output_jar = ctx.actions.declare_file(output_jar_name)
+    plugins = []
+    if JavaPluginInfo in target:
+        plugins.append(target[JavaPluginInfo])
+    plugins.append(ctx.attr._analyzer[JavaPluginInfo])
     java_common.compile(
         ctx,
         java_toolchain = ctx.attr._java_toolchain[java_common.JavaToolchainInfo],
         source_jars = orig_java_info.source_jars,
         javac_opts = javac_opts,
         output = output_jar,
-        plugins = [ctx.attr._analyzer[JavaPluginInfo]],
+        plugins = plugins,
+        strict_deps = "OFF",
+        # TODO: use annotation_processor_additional_outputs to simplify this logic
         deps = [
             java_common.merge([dep[JavaInfo] for dep in ctx.rule.attr.deps if JavaInfo in dep]),
         ],
@@ -44,6 +73,7 @@ def _analyzer_impl(target, ctx):
         inputs = [ctx.executable._zipper, output_jar],
         outputs = [extracted_file],
         command = """
+#!/bin/bash
 set -euo pipefail
 
 ZIPPER=$1
@@ -51,7 +81,7 @@ CLASS_JAR=$2
 OUTPUT_FILE=$3
 
 echo '[' > $OUTPUT_FILE
-json_files=$($ZIPPER v $CLASS_JAR | grep -oE '[^ ]+-symbols.json$')
+json_files=$($ZIPPER v $CLASS_JAR | grep -oE '[^ ]+-symbols.json$' || true)
 for json_file in $json_files; do
     $ZIPPER x $CLASS_JAR $json_file
     cat $json_file >> $OUTPUT_FILE
@@ -66,9 +96,13 @@ echo ']' >> $OUTPUT_FILE
         arguments = [ctx.actions.args().add(ctx.executable._zipper).add(output_jar).add(extracted_file)],
     )
 
+    all_transitive_symbol_files = depset([extracted_file], transitive = transitive)
     return [
         OutputGroupInfo(
-            unused_deps_analysis_file = depset([extracted_file]),
+            unused_deps_analysis_file = all_transitive_symbol_files,
+        ),
+        SymbolMetadata(
+            symbol_files = all_transitive_symbol_files,
         ),
     ]
 

@@ -73,6 +73,9 @@ public class SymbolsFileGatherer {
               symbolsResults.add(result);
             }
           }
+        } catch (Exception e) {
+          System.out.println("WARNING: Error reading symbols file: " + symbolsFile + ": " + e);
+          e.printStackTrace();
         }
       }
     }

@@ -9,13 +9,15 @@ public abstract class BazelBuildResult {
 
   public abstract Duration getTimeElapsed();
 
-  public static BazelBuildResult create(String bazelOutput, Duration timeElapsed) {
-    return new AutoValue_BazelBuildResult(bazelOutput, timeElapsed);
+  public abstract int exitCode();
+
+  public static BazelBuildResult create(String bazelOutput, Duration timeElapsed, int exitCode) {
+    return new AutoValue_BazelBuildResult(bazelOutput, timeElapsed, exitCode);
   }
 
   @Override
   public final String toString() {
-    return "Bazel build completed\n"
+    return "Bazel build finished with code " + exitCode() + "\n"
         + String.format("Time elapsed: %d seconds\n", getTimeElapsed().getSeconds());
   }
 }
